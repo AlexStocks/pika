@@ -13,7 +13,7 @@
 #include "include/pika_server.h"
 #include "pstd/include/pstd_defer.h"
 
-extern PikaServer* g_pika_server;
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
 extern std::unique_ptr<PikaCmdTableManager> g_pika_cmd_table_manager;
 

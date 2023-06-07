@@ -18,7 +18,7 @@
 
 using pstd::Status;
 
-extern PikaServer* g_pika_server;
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
 
 StableLog::StableLog(std::string db_name, uint32_t slot_id, std::string log_path)

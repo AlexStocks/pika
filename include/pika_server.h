@@ -422,6 +422,7 @@ class PikaServer : public pstd::noncopyable {
    */
   std::unique_ptr<net::PubSubThread> pika_pubsub_thread_;
 
+ public:
   /*
    * Communication used
    */

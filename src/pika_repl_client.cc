@@ -21,7 +21,7 @@
 #include "include/pika_server.h"
 
 using pstd::Status;
-extern PikaServer* g_pika_server;
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
 
 PikaReplClient::PikaReplClient(int cron_interval, int keepalive_timeout)  {

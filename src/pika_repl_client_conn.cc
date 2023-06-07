@@ -16,7 +16,7 @@
 
 using pstd::Status;
 
-extern PikaServer* g_pika_server;
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
 
 PikaReplClientConn::PikaReplClientConn(int fd, const std::string& ip_port, net::Thread* thread,

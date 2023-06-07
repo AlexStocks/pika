@@ -24,9 +24,9 @@ endif()
 
 #Sanitizer for testing stage
 #CMAKE_BUILD_TYPE must be "Debug" if you wanna use sanitizer.
-#set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE "Debug")
 
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address")
 # [Notice] address sanitizer and thread sanitizer can not be enabled at the same time.
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=thread")
 

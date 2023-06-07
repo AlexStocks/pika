@@ -16,7 +16,7 @@
 
 using pstd::Status;
 
-extern PikaServer* g_pika_server;
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
 
 std::string SlotPath(const std::string& db_path, uint32_t slot_id) {

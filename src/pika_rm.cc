@@ -22,8 +22,8 @@
 
 using pstd::Status;
 
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
-extern PikaServer* g_pika_server;
 
 /* SyncSlot */
 

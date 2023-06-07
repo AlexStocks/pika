@@ -8,7 +8,7 @@
 #include "include/pika_rm.h"
 #include "include/pika_server.h"
 
-extern PikaServer* g_pika_server;
+extern std::unique_ptr<PikaServer> g_pika_server;
 extern std::unique_ptr<PikaReplicaManager> g_pika_rm;
 
 PikaReplServerThread::PikaReplServerThread(const std::set<std::string>& ips, int port, int cron_interval)

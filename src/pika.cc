@@ -20,8 +20,7 @@
 #include "pstd/include/pstd_defer.h"
 
 std::unique_ptr<PikaConf> g_pika_conf;
-// todo : change to unique_ptr will coredump
-PikaServer* g_pika_server = nullptr;
+std::unique_ptr<PikaServer> g_pika_server;
 std::unique_ptr<PikaReplicaManager> g_pika_rm;
 
 std::unique_ptr<PikaCmdTableManager> g_pika_cmd_table_manager;
@@ -189,7 +188,7 @@ int main(int argc, char* argv[]) {
 
   LOG(INFO) << "Server at: " << path;
   g_pika_cmd_table_manager = std::make_unique<PikaCmdTableManager>();
-  g_pika_server = new PikaServer();
+  g_pika_server = std::make_unique<PikaServer>();
   g_pika_rm = std::make_unique<PikaReplicaManager>();
 
   if (g_pika_conf->daemonize()) {
@@ -197,8 +196,8 @@ int main(int argc, char* argv[]) {
   }
 
   DEFER {
-    delete g_pika_server;
-    g_pika_server = nullptr;
+//    g_pika_server->pika_auxiliary_thread_.reset();
+    g_pika_server.reset();
     g_pika_rm.reset();
     g_pika_cmd_table_manager.reset();
     ::google::ShutdownGoogleLogging();
