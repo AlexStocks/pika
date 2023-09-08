@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.14)
 PROJECT(PikiwiDB)
 
-SET(CMAKE_CXX_STANDARD 20)
+SET(CMAKE_CXX_STANDARD 17)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -g -D'GIT_COMMIT_ID=\"${GIT_COMMIT_ID}\"'")
 
@@ -10,7 +10,6 @@ IF (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
     CMAKE_POLICY(SET CMP0135 NEW)
 ENDIF ()
 
-SET(CMAKE_CXX_STANDARD 20)
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ENABLE_TESTING()
 
@@ -106,7 +105,9 @@ include(cmake/libevent.cmake)
 include(cmake/llhttp.cmake)
 include(cmake/spdlog.cmake)
 include(cmake/fmt.cmake)
+include(cmake/tbb.cmake)
 
+#SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSING_TBB")
 
 ADD_SUBDIRECTORY(src/std)
 ADD_SUBDIRECTORY(src/net)

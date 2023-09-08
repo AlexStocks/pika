@@ -1,0 +1,11 @@
+FETCHCONTENT_DECLARE(
+        tbb
+        GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+        GIT_TAG v2021.10.0
+)
+FETCHCONTENT_MAKEAVAILABLE(tbb)
+
+OPTION(WITH_USING_TBB "build with oneTBB support" ON)
+IF(WITH_USING_TBB)
+    ADD_DEFINITIONS(-DUSING_TBB -DTBB_TEST=OFF)
+ENDIF()

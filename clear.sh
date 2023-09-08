@@ -15,4 +15,5 @@ rm -rf ./buildtrees
 rm -rf ./build
 rm -rf ./bin
 rm -rf ./dbsync
+rm -rf ./log
 

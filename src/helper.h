@@ -49,6 +49,59 @@ inline typename HASH::const_local_iterator RandomHashMember(const HASH& containe
 }
 
 // scan
+
+#if defined(USING_TBB)
+
+template <typename HASH>
+inline size_t ScanHashMember(const HASH& container, size_t cursor, size_t count,
+                             std::vector<typename HASH::const_iterator>& res) {
+  if (cursor >= container.size()) {
+    return 0;
+  }
+
+  auto idx = cursor;
+  for (decltype(container.bucket_count()) bucket = 0; bucket < container.bucket_count(); ++bucket) {
+    const auto bktSize = container.bucket_size(bucket);
+    if (idx < bktSize) {
+      // find the bucket;
+      auto it = container.begin(bucket);
+      while (idx > 0) {
+        ++it;
+        --idx;
+      }
+
+      size_t newCursor = cursor;
+      auto end = container.end(bucket);
+      while (res.size() < count && it != end) {
+        ++newCursor;
+        res.push_back(it++);
+
+        if (it == end) {
+          while (++bucket < container.bucket_count()) {
+            if (container.bucket_size(bucket) > 0) {
+              it = container.begin(bucket);
+              end = container.end(bucket);
+              break;
+            }
+          }
+
+          if (bucket == container.bucket_count()) {
+            return 0;
+          }
+        }
+      }
+
+      return newCursor;
+    } else {
+      idx -= bktSize;
+    }
+  }
+
+  return 0;  // never here
+}
+
+#else
+
 template <typename HASH>
 inline size_t ScanHashMember(const HASH& container, size_t cursor, size_t count,
                              std::vector<typename HASH::const_local_iterator>& res) {
@@ -96,6 +149,8 @@ inline size_t ScanHashMember(const HASH& container, size_t cursor, size_t count,
 
   return 0;  // never here
 }
+
+#endif
 
 extern void getRandomHexChars(char* p, unsigned int len);
 

@@ -395,7 +395,7 @@ PError hscan(const std::vector<PString>& params, UnboundedBuffer* reply) {
   }
 
   if (count < 0) {
-    count = 5;
+    count = 10;
   }
 
   // scan

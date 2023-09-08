@@ -10,11 +10,21 @@
 #include "helper.h"
 #include "pstring.h"
 
-#include <unordered_map>
+#if defined(USING_TBB)
+#  include <tbb/concurrent_hash_map.h>
+#else
+#  include <unordered_map>
+#endif
 
 namespace pikiwidb {
 
+#if defined(USING_TBB)
+// using PHash = tbb::concurrent_hash_map<PString, PString, my_hash, std::equal_to<PString> >;
+using PHash = tbb::concurrent_hash_map<PString, PString>;
+using Accessor = tbb::concurrent_hash_map<PString, PString>::accessor;
+#else
 using PHash = std::unordered_map<PString, PString, my_hash, std::equal_to<PString> >;
+#endif
 
 size_t HScanKey(const PHash& hash, size_t cursor, size_t count, std::vector<PString>& res);
 
