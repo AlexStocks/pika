@@ -13,6 +13,14 @@
 
 namespace pikiwidb {
 
+
+enum class State {
+  kNone = 0,
+  kStarted = 1,
+  kStopping = 2,
+  kStopped = 3,
+};
+
 template <typename T>
 inline T ToValue(const void* ptr) {
   static_assert(sizeof(T) == sizeof(void*), "must equal to pointer size");

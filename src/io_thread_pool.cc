@@ -51,8 +51,8 @@ bool IOThreadPool::SetWorkerNum(size_t num) {
     return false;
   }
 
-  if (!loops_.empty()) {
-    ERROR("can only called once, not empty loops size: {}", loops_.size());
+  if (!workers_.empty()) {
+    ERROR("can only called once, not empty thread pool size: {}", workers_.size());
     return false;
   }
 
@@ -63,7 +63,6 @@ bool IOThreadPool::SetWorkerNum(size_t num) {
 
   worker_num_.store(num);
   workers_.reserve(num);
-  loops_.reserve(num);
 
   return true;
 }
@@ -90,34 +89,33 @@ void IOThreadPool::Run(int ac, char* av[]) {
   base_.Run();
 
   for (auto& w : workers_) {
-    w.join();
+    w->Stop();
   }
   workers_.clear();
+
+  State expected = State::kStopping;
+  state_.compare_exchange_strong(expected, State::kStopped);
 
   INFO("Process stopped, goodbye...");
 }
 
 void IOThreadPool::Exit() {
-  state_ = State::kStopped;
-
-  BaseLoop()->Stop();
-  for (size_t index = 0; index < loops_.size(); ++index) {
-    EventLoop* loop = loops_[index].get();
-    loop->Stop();
+  State expected = State::kStarted;
+  if (state_.compare_exchange_strong(expected, State::kStopping)) {
+    BaseLoop()->Stop();
   }
 }
 
-bool IOThreadPool::IsExit() const { return state_ == State::kStopped; }
+bool IOThreadPool::IsExit() const { return state_ == State::kStopped || state_ == State::kStopping; }
 
 EventLoop* IOThreadPool::BaseLoop() { return &base_; }
 
 EventLoop* IOThreadPool::Next() {
-  if (loops_.empty()) {
+  if (workers_.empty()) {
     return BaseLoop();
   }
 
-  auto& loop = loops_[current_loop_++ % loops_.size()];
-  return loop.get();
+  return (workers_[current_loop_++ % workers_.size()])->GetEventLoop();
 }
 
 void IOThreadPool::StartWorkers() {
@@ -125,22 +123,12 @@ void IOThreadPool::StartWorkers() {
   assert(state_ == State::kNone);
 
   size_t index = 1;
-  while (loops_.size() < worker_num_) {
-    std::unique_ptr<EventLoop> loop(new EventLoop);
+  while (workers_.size() < worker_num_) {
+    std::unique_ptr<PThread> t(new PThread);
     if (!name_.empty()) {
-      loop->SetName(name_ + "_" + std::to_string(index++));
-      printf("loop %p, name %s\n", loop.get(), loop->GetName().c_str());
+      t->SetName(name_ + "_" + std::to_string(index++));
     }
-    loops_.push_back(std::move(loop));
-  }
-
-  for (index = 0; index < loops_.size(); ++index) {
-    EventLoop* loop = loops_[index].get();
-    std::thread t([loop]() {
-      loop->Init();
-      loop->Run();
-    });
-    printf("thread %lu, thread loop %p, loop name %s \n", index, loop, loop->GetName().c_str());
+    t->Start();
     workers_.push_back(std::move(t));
   }
 

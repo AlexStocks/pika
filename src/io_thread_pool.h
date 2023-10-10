@@ -15,6 +15,9 @@
 #include "net/event_loop.h"
 #include "net/http_client.h"
 #include "net/http_server.h"
+#include "net/util.h"
+
+#include "io_thread.h"
 
 namespace pikiwidb {
 
@@ -25,6 +28,10 @@ class IOThreadPool {
 
   bool Init(const char* ip, int port, NewTcpConnectionCallback ccb);
   void Run(int argc, char* argv[]);
+  // only called by main thread
+  // When called upon normal exit or upon receiving a signal,
+  // it triggers the base loop to exit. The IOThreadPool::Run()
+  // function will also lead other workers to exit.
   void Exit();
   bool IsExit() const;
   EventLoop* BaseLoop();
@@ -69,15 +76,10 @@ class IOThreadPool {
   EventLoop base_;
 
   std::atomic<size_t> worker_num_{0};
-  std::vector<std::thread> workers_;
-  std::vector<std::unique_ptr<EventLoop>> loops_;
+
+  std::vector<std::unique_ptr<PThread>> workers_;
   mutable std::atomic<size_t> current_loop_{0};
 
-  enum class State {
-    kNone,
-    kStarted,
-    kStopped,
-  };
   std::atomic<State> state_;
 };
 
