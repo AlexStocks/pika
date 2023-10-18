@@ -6,6 +6,8 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/mman.h>
 #include <cassert>
 
 #include <cstdio>
@@ -24,6 +26,7 @@ namespace filesystem = std::experimental::filesystem;
 #endif
 
 #include <glog/logging.h>
+//#include <sys/sysinfo.h>
 
 namespace pstd {
 
@@ -181,13 +184,14 @@ int DeleteDir(const std::string& path) {
   return -1;
 }
 
-bool DeleteDirIfExist(const std::string& path) {
-  return !(IsDir(path) == 0 && DeleteDir(path) != 0);
-}
+bool DeleteDirIfExist(const std::string& path) { return !(IsDir(path) == 0 && DeleteDir(path) != 0); }
 
 uint64_t Du(const std::string& path) {
   uint64_t sum = 0;
   try {
+    if (!filesystem::exists(path)) {
+      return 0;
+    }
     if (filesystem::is_symlink(path)) {
       filesystem::path symlink_path = filesystem::read_symlink(path);
       sum = Du(symlink_path);
@@ -205,7 +209,7 @@ uint64_t Du(const std::string& path) {
       sum = filesystem::file_size(path);
     }
   } catch (const filesystem::filesystem_error& ex) {
-    LOG(WARNING) << "Error accessing path: " << ex.what() << std::endl;
+    LOG(WARNING) << "Error accessing path: " << ex.what();
   }
 
   return sum;
@@ -228,7 +232,7 @@ class PosixSequentialFile : public SequentialFile {
  public:
   virtual void setUnBuffer() { setbuf(file_, nullptr); }
 
-  PosixSequentialFile(std::string  fname, FILE* f) : filename_(std::move(fname)), file_(f) { setbuf(file_, nullptr); }
+  PosixSequentialFile(std::string fname, FILE* f) : filename_(std::move(fname)), file_(f) { setbuf(file_, nullptr); }
 
   ~PosixSequentialFile() override {
     if (file_) {
@@ -282,14 +286,14 @@ class PosixMmapFile : public WritableFile {
  private:
   std::string filename_;
   int fd_ = -1;
-  size_t page_size_      = 0;
-  size_t map_size_       = 0;       // How much extra memory to map at a time
-  char* base_            = nullptr; // The mapped region
-  char* limit_           = nullptr; // Limit of the mapped region
-  char* dst_             = nullptr; // Where to write next  (in range [base_,limit_])
-  char* last_sync_       = nullptr; // Where have we synced up to
-  uint64_t file_offset_  = 0;       // Offset of base_ in file
-  uint64_t write_len_    = 0;       // The data that written in the file
+  size_t page_size_ = 0;
+  size_t map_size_ = 0;        // How much extra memory to map at a time
+  char* base_ = nullptr;       // The mapped region
+  char* limit_ = nullptr;      // Limit of the mapped region
+  char* dst_ = nullptr;        // Where to write next  (in range [base_,limit_])
+  char* last_sync_ = nullptr;  // Where have we synced up to
+  uint64_t file_offset_ = 0;   // Offset of base_ in file
+  uint64_t write_len_ = 0;     // The data that written in the file
 
   // Have we done an munmap of unsynced data?
   bool pending_sync_ = false;
@@ -352,14 +356,13 @@ class PosixMmapFile : public WritableFile {
   }
 
  public:
-  PosixMmapFile(std::string  fname, int fd, size_t page_size, uint64_t write_len = 0)
+  PosixMmapFile(std::string fname, int fd, size_t page_size, uint64_t write_len = 0)
       : filename_(std::move(fname)),
         fd_(fd),
         page_size_(page_size),
         map_size_(Roundup(kMmapBoundSize, page_size)),
 
-        write_len_(write_len)
-        {
+        write_len_(write_len) {
     if (write_len_ != 0) {
       while (map_size_ < write_len_) {
         map_size_ += (1024 * 1024);
@@ -470,7 +473,7 @@ RWFile::~RWFile() = default;
 
 class MmapRWFile : public RWFile {
  public:
-  MmapRWFile(std::string  fname, int fd, size_t page_size)
+  MmapRWFile(std::string fname, int fd, size_t page_size)
       : filename_(std::move(fname)), fd_(fd), page_size_(page_size), map_size_(Roundup(65536, page_size)) {
     DoMapRegion();
   }
@@ -504,7 +507,7 @@ class MmapRWFile : public RWFile {
   static size_t Roundup(size_t x, size_t y) { return ((x + y - 1) / y) * y; }
   std::string filename_;
   int fd_ = -1;
-  size_t page_size_[[maybe_unused]] = 0;
+  size_t page_size_ [[maybe_unused]] = 0;
   size_t map_size_ = 0;
   char* base_ = nullptr;
 };
@@ -518,8 +521,7 @@ class PosixRandomRWFile : public RandomRWFile {
   // bool fallocate_with_keep_size_;
 
  public:
-  PosixRandomRWFile(std::string fname, int fd)
-      : filename_(std::move(fname)), fd_(fd) {
+  PosixRandomRWFile(std::string fname, int fd) : filename_(std::move(fname)), fd_(fd) {
     // fallocate_with_keep_size_ = options.fallocate_with_keep_size;
   }
 
@@ -674,5 +676,26 @@ Status NewRandomRWFile(const std::string& fname, std::unique_ptr<RandomRWFile>& 
   }
   return s;
 }
+
+int ClearSystemCachedMemory() {
+  int ret = system("echo 1 > /proc/sys/vm/drop_caches");
+  if (ret == 0 || (WIFEXITED(ret) && !WEXITSTATUS(ret))) {
+    return 0;
+  }
+  LOG(WARNING) << "Clear system cached memory failed : %d!" << ret;
+  return ret;
+}
+
+//int SystemFreeMemory(unsigned long* free_mem) {
+//  struct sysinfo info;
+//  int ret = sysinfo(&info);
+//  if (ret == 0) {
+//    *free_mem = info.freeram;
+//    return 0;
+//  }
+//  LOG(WARNING) << "Get system free memory failed : %d!" << ret;
+//  return ret;
+//}
+
 
 }  // namespace pstd

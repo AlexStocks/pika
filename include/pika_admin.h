@@ -211,7 +211,8 @@ class InfoCmd : public Cmd {
     kInfo,
     kInfoAll,
     kInfoDebug,
-    kInfoCommandStats
+    kInfoCommandStats,
+    kInfoCache
   };
 
   InfoCmd(const std::string& name, int arity, uint16_t flag) : Cmd(name, arity, flag) {}
@@ -239,6 +240,7 @@ class InfoCmd : public Cmd {
   const static std::string kRocksDBSection;
   const static std::string kDebugSection;
   const static std::string kCommandStatsSection;
+  const static std::string kCacheSection;
 
   void DoInitial() override;
   void Clear() override {
@@ -259,6 +261,11 @@ class InfoCmd : public Cmd {
   void InfoRocksDB(std::string& info);
   void InfoDebug(std::string& info);
   void InfoCommandStats(std::string& info);
+  void InfoCache(std::string& info);
+
+  std::string CacheStatusToString(int status);
+
+  static const std::string KPcache;
 };
 
 class ShutdownCmd : public Cmd {
@@ -288,6 +295,7 @@ class ConfigCmd : public Cmd {
   void ConfigSet(std::string& ret);
   void ConfigRewrite(std::string& ret);
   void ConfigResetstat(std::string& ret);
+  void ConfigRewriteReplicationID(std::string& ret);
 };
 
 class MonitorCmd : public Cmd {
@@ -363,6 +371,23 @@ class ScandbCmd : public Cmd {
   storage::DataType type_ = storage::kAll;
   void DoInitial() override;
   void Clear() override { type_ = storage::kAll; }
+};
+
+class CacheCmd : public Cmd {
+public:
+    CacheCmd(const std::string& name, int arity, uint16_t flag) : Cmd(name, arity, flag) {}
+    void Do(std::shared_ptr<Slot> slot = nullptr) override;
+    void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) override{};
+    void Merge() override{};
+    Cmd* Clone() override { return new CacheCmd(*this); }
+private:
+    enum CacheCondition {kCLEAR_DB, kCLEAR_HITRATIO, kDEL_KEYS, kRANDOM_KEY};
+    CacheCondition condition_;
+    std::vector<std::string> keys_;
+    void DoInitial() override;
+    virtual void Clear() override {
+        keys_.clear();
+    }
 };
 
 class SlowlogCmd : public Cmd {
@@ -460,6 +485,30 @@ class DiskRecoveryCmd : public Cmd {
  private:
   void DoInitial() override;
   std::map<std::string, uint64_t> background_errors_;
+};
+
+class ClearReplicationIDCmd : public Cmd {
+ public:
+  ClearReplicationIDCmd(const std::string& name, int arity, uint16_t flag) : Cmd(name, arity, flag) {}
+  void Do(std::shared_ptr<Slot> slot = nullptr) override;
+  void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) override{};
+  void Merge() override{};
+  Cmd* Clone() override { return new ClearReplicationIDCmd(*this); }
+
+ private:
+  void DoInitial() override;
+};
+
+class DisableWalCmd : public Cmd {
+ public:
+  DisableWalCmd(const std::string& name, int arity, uint16_t flag) : Cmd(name, arity, flag) {}
+  void Do(std::shared_ptr<Slot> slot = nullptr) override;
+  void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) override{};
+  void Merge() override{};
+  Cmd* Clone() override { return new DisableWalCmd(*this); }
+
+ private:
+  void DoInitial() override;
 };
 
 #ifdef WITH_COMMAND_DOCS

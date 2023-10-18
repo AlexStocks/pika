@@ -585,9 +585,9 @@ ExternalProject_Add(rocksdb
   ${LIBGPERF_NAME}
   ${LIBJEMALLOC_NAME}
   URL
-  https://github.com/facebook/rocksdb/archive/refs/tags/v8.1.1.tar.gz
+  https://github.com/facebook/rocksdb/archive/refs/tags/v8.3.3.tar.gz
   URL_HASH
-  MD5=3b4c97ee45df9c8a5517308d31ab008b
+  MD5=2815555a2ee2d12a7081a91fb988bf24
   DOWNLOAD_NO_PROGRESS
   1
   UPDATE_COMMAND
@@ -626,13 +626,41 @@ ExternalProject_Add(rocksdb
   make -j${CPU_CORE}
 )
 
+ExternalProject_Add(rediscache
+  URL
+  https://github.com/pikiwidb/rediscache/archive/refs/tags/v1.0.1.tar.gz
+  URL_HASH
+  MD5=da2c7e3b5bce1713d1987339cc937d31
+  DOWNLOAD_NO_PROGRESS
+  1
+  UPDATE_COMMAND
+  ""
+  LOG_BUILD
+  1
+  BUILD_IN_SOURCE
+  1
+  SOURCE_SUBDIR
+  ""
+  CMAKE_ARGS
+  -DCMAKE_INSTALL_PREFIX=${STAGED_INSTALL_PREFIX}
+  -DCMAKE_INSTALL_INCLUDEDIR=${INSTALL_INCLUDEDIR}
+  -DCMAKE_INSTALL_LIBDIR=${INSTALL_LIBDIR}
+  -DCMAKE_BUILD_TYPE=${LIB_BUILD_TYPE}
+  BUILD_ALWAYS
+  1
+  BUILD_COMMAND
+  make -j${CPU_CORE}
+)
+set(REDISCACHE_INCLUDE_DIR ${INSTALL_INCLUDEDIR})
+set(REDISCACHE_LIBRARY ${INSTALL_LIBDIR}/librediscache.a)
+
 option(USE_PIKA_TOOLS "compile pika-tools" OFF)
 if (USE_PIKA_TOOLS)
   ExternalProject_Add(hiredis
     URL
-    https://github.com/vipshop/hiredis-vip/archive/refs/tags/0.3.0.tar.gz
+    https://github.com/redis/hiredis/archive/refs/tags/v1.2.0.tar.gz
     URL_HASH
-    MD5=e4d4a2928188b11f696d35ca1c52e9a4
+    MD5=119767d178cfa79718a80c83e0d0e849
     DOWNLOAD_NO_PROGRESS
     1
     UPDATE_COMMAND
@@ -654,7 +682,7 @@ if (USE_PIKA_TOOLS)
     INSTALL_COMMAND
     make PREFIX=${STAGED_INSTALL_PREFIX} -j${CPU_CORE} install
   )
-  set(HIREDIS_LIBRARY ${INSTALL_LIBDIR}/libhiredis_vip.a)
+  set(HIREDIS_LIBRARY ${INSTALL_LIBDIR}/libhiredis.a)
 
   ExternalProject_Add(bz2
     URL
@@ -697,6 +725,7 @@ set(ROCKSDB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${EP_BASE_SUFFIX}/Source/rock
 add_subdirectory(src/pstd)
 add_subdirectory(src/net)
 add_subdirectory(src/storage)
+add_subdirectory(src/dory)
 if (USE_PIKA_TOOLS)
   add_subdirectory(tools)
 endif()
@@ -766,7 +795,10 @@ add_dependencies(${PROJECT_NAME}
   protobuf
   pstd
   net
-  storage)
+  rediscache
+  storage
+  dory
+  )
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
@@ -775,6 +807,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
+  dory
   storage
   net
   pstd
@@ -787,6 +820,8 @@ target_link_libraries(${PROJECT_NAME}
   libzstd.a
   liblz4.a
   libz.a
+  librediscache.a
+  ${REDISCACHE_LIBRARY}
   ${LIBUNWIND_LIBRARY}
   ${JEMALLOC_LIBRARY})
 

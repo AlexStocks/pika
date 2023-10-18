@@ -22,6 +22,7 @@
 #define kBinlogReadWinDefaultSize 9000
 #define kBinlogReadWinMaxSize 90000
 const uint32_t configRunIDSize = 40;
+const uint32_t configReplicationIDSize = 50;
 
 // global class, class members well initialized
 class PikaConf : public pstd::BaseConf {
@@ -150,6 +151,10 @@ class PikaConf : public pstd::BaseConf {
     std::shared_lock l(rwlock_);
     return master_run_id_;
   }
+  std::string replication_id() {
+    std::shared_lock l(rwlock_);
+    return replication_id_;
+  }
   std::string requirepass() {
     std::shared_lock l(rwlock_);
     return requirepass_;
@@ -222,6 +227,10 @@ class PikaConf : public pstd::BaseConf {
   int max_background_compactions() {
     std::shared_lock l(rwlock_);
     return max_background_compactions_;
+  }
+  int max_background_jobs() {
+    std::shared_lock l(rwlock_);
+    return max_background_jobs_;
   }
   int max_cache_files() {
     std::shared_lock l(rwlock_);
@@ -337,6 +346,65 @@ class PikaConf : public pstd::BaseConf {
     std::shared_lock l(rwlock_);
     return max_rsync_parallel_num_;
   }
+  int cache_num(){
+    std::shared_lock l(rwlock_);
+    return cache_num_;
+  }
+  int cache_model(){
+    std::shared_lock l(rwlock_);
+    return cache_model_;
+  }
+  int cache_string() {
+    std::shared_lock l(rwlock_);
+    return cache_string_;
+  }
+   int cache_set() {
+    std::shared_lock l(rwlock_);
+    return cache_set_;
+  }
+  int cache_zset() {
+    std::shared_lock l(rwlock_);
+    return cache_zset_;
+  }
+  int cache_hash() {
+    std::shared_lock l(rwlock_);
+    return cache_hash_;
+  }
+  int cache_list() {
+    std::shared_lock l(rwlock_);
+    return cache_list_;
+  }
+  int cache_bit() {
+    std::shared_lock l(rwlock_);
+    return cache_bit_;
+  }
+  int cache_start_pos() {
+    std::shared_lock l(rwlock_);
+    return cache_start_pos_;
+  }
+  int cache_items_per_key() {
+    std::shared_lock l(rwlock_);
+    return cache_items_per_key_;
+  }
+  int64_t cache_maxmemory() {
+    std::shared_lock l(rwlock_);
+    return cache_maxmemory_;
+  }
+  int cache_maxmemory_policy() {
+    std::shared_lock l(rwlock_);
+    return cache_maxmemory_policy_;
+  }
+  int cache_maxmemory_samples() {
+    std::shared_lock l(rwlock_);
+    return cache_maxmemory_samples_;
+  }
+  int cache_lfu_decay_time() {
+    std::shared_lock l(rwlock_);
+    return cache_lfu_decay_time_;
+  }
+
+  int64_t min_system_free_mem()
+  { return min_system_free_mem_; }
   // Immutable config items, we don't use lock.
   bool daemonize() { return daemonize_; }
   std::string pidfile() { return pidfile_; }
@@ -373,6 +441,11 @@ class PikaConf : public pstd::BaseConf {
     std::lock_guard l(rwlock_);
     TryPushDiffCommands("master-run-id", value);
     master_run_id_ = value;
+  }
+  void SetReplicationID(const std::string& value) {
+    std::lock_guard l(rwlock_);
+    TryPushDiffCommands("replication-id", value);
+    replication_id_ = value;
   }
   void SetSlavePriority(const int value) {
     std::lock_guard l(rwlock_);
@@ -531,6 +604,11 @@ class PikaConf : public pstd::BaseConf {
     TryPushDiffCommands("max-background-compactions", std::to_string(value));
     max_background_compactions_ = value;
   }
+  void SetMaxBackgroudJobs(const int& value) {
+    std::lock_guard l(rwlock_);
+    TryPushDiffCommands("max-background-jobs", std::to_string(value));
+    max_background_jobs_ = value;
+  }
   void SetWriteBufferSize(const int& value) {
     std::lock_guard l(rwlock_);
     TryPushDiffCommands("write-buffer-size", std::to_string(value));
@@ -565,6 +643,54 @@ class PikaConf : public pstd::BaseConf {
     TryPushDiffCommands("max-rsync-parallel-num", std::to_string(value));
     max_rsync_parallel_num_ = value;
   }
+  void SetCacheNum(const int value){
+      std::lock_guard l(rwlock_);
+      TryPushDiffCommands("cache-num", std::to_string(value));
+      cache_num_ = value;
+  }
+  void SetCacheModel(const int value){
+      std::lock_guard l(rwlock_);
+      TryPushDiffCommands("cache-model", std::to_string(value));
+      cache_model_ = value;
+  }
+  void SetCacheDisableFlag(){
+      std::lock_guard l(rwlock_);
+      tmp_cache_disable_flag_ = true;
+  }
+  void UnsetCacheDisableFlag(){
+      std::lock_guard l(rwlock_);
+      tmp_cache_disable_flag_ = false;
+  }
+  bool IsCacheDisabledTemporarily(){
+      std::lock_guard l(rwlock_);
+      return tmp_cache_disable_flag_;
+  }
+  void SetCacheType(const std::string &value);
+  void SetCacheStartPos(const int value){
+      std::lock_guard l(rwlock_);
+      cache_start_pos_ = value;
+  }
+  void SetCacheItemsPerKey(const int value){
+      std::lock_guard l(rwlock_);
+      cache_items_per_key_ = value;
+  }
+  void SetCacheMaxmemory(const int64_t value){
+      std::lock_guard l(rwlock_);
+      cache_maxmemory_ = value;
+  }
+  void SetCacheMaxmemoryPolicy(const int value){
+      std::lock_guard l(rwlock_);
+      cache_maxmemory_policy_ = value;
+  }
+  void SetCacheMaxmemorySamples(const int value){
+      std::lock_guard l(rwlock_);
+      cache_maxmemory_samples_ = value;
+  }
+  void SetCacheLFUDecayTime(const int value){
+      std::lock_guard l(rwlock_);
+      TryPushDiffCommands("cache-lfu-", std::to_string(value));
+      cache_lfu_decay_time_ = value;
+  }
 
   pstd::Status DBSlotsSanityCheck(const std::string& db_name, const std::set<uint32_t>& slot_ids,
                                     bool is_add);
@@ -577,6 +703,7 @@ class PikaConf : public pstd::BaseConf {
 
   int Load();
   int ConfigRewrite();
+  int ConfigRewriteReplicationID();
 
  private:
   pstd::Status InternalGetTargetDB(const std::string& db_name, uint32_t* target);
@@ -610,6 +737,7 @@ class PikaConf : public pstd::BaseConf {
   std::string server_id_;
   std::string run_id_;
   std::string master_run_id_;
+  std::string replication_id_;
   std::string requirepass_;
   std::string masterauth_;
   std::string userpass_;
@@ -641,6 +769,7 @@ class PikaConf : public pstd::BaseConf {
   int small_compaction_threshold_ = 0;
   int max_background_flushes_ = 0;
   int max_background_compactions_ = 0;
+  int max_background_jobs_ = 0;
   int max_cache_files_ = 0;
   int max_bytes_for_level_multiplier_ = 0;
   int64_t block_size_ = 0;
@@ -674,6 +803,26 @@ class PikaConf : public pstd::BaseConf {
   int target_file_size_base_ = 0;
   int binlog_file_size_ = 0;
 
+  // cache
+  std::atomic<int> cache_num_;
+  std::atomic<int> cache_model_;
+  std::atomic<bool> tmp_cache_disable_flag_;
+  std::vector<std::string> cache_type_;
+  std::atomic<int> cache_string_;
+  std::atomic<int> cache_set_;
+  std::atomic<int> cache_zset_;
+  std::atomic<int> cache_hash_;
+  std::atomic<int> cache_list_;
+  std::atomic<int> cache_bit_;
+  std::atomic<int> cache_start_pos_;
+  std::atomic<int> cache_items_per_key_;
+  std::atomic<int64_t> cache_maxmemory_;
+  std::atomic<int> cache_maxmemory_policy_;
+  std::atomic<int> cache_maxmemory_samples_;
+  std::atomic<int> cache_lfu_decay_time_;
+  std::atomic<int64_t> min_system_free_mem_;
+
+
   // rocksdb blob
   bool enable_blob_files_ = false;
   int64_t min_blob_size_ = 4096;                // 4K
@@ -690,7 +839,7 @@ class PikaConf : public pstd::BaseConf {
   std::shared_mutex rwlock_;
 
   // Rsync Rate limiting configuration
-  int throttle_bytes_per_second_ = 307200000;
+  int throttle_bytes_per_second_ = 207200000;
   int max_rsync_parallel_num_ = 4;
 };
 

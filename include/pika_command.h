@@ -51,6 +51,9 @@ const std::string kCmdNameQuit = "quit";
 const std::string kCmdNameHello = "hello";
 const std::string kCmdNameCommand = "command";
 const std::string kCmdNameDiskRecovery = "diskrecovery";
+const std::string kCmdNameClearReplicationID = "clearreplicationid";
+const std::string kCmdNameDisableWal = "disablewal";
+const std::string kCmdNameCache = "cache";
 
 // Migrate slot
 const std::string kCmdNameSlotsMgrtSlot = "slotsmgrtslot";
@@ -230,7 +233,8 @@ enum CmdFlagsMask {
   kCmdFlagsMaskAdminRequire = 256,
   kCmdFlagsMaskPreDo = 512,
   kCmdFlagsMaskCacheDo = 1024,
-  kCmdFlagsMaskPostDo = 2048,
+  kCmdFlagsMaskUpdateCache = 2048,
+  kCmdFlagsMaskOnlyDoCache = 4096,
   kCmdFlagsMaskSlot = 1536,
 };
 
@@ -258,7 +262,8 @@ enum CmdFlags {
   kCmdFlagsDoNotSpecifySlot = 0,  // default do not specify slot
   kCmdFlagsSingleSlot = 512,
   kCmdFlagsMultiSlot = 1024,
-  kCmdFlagsPreDo = 2048,
+  kCmdFlagsUpdateCache = 2048,
+  kCmdFlagsOnlyDoCache = 4096
 };
 
 void inline RedisAppendContent(std::string& str, const std::string& value);
@@ -296,6 +301,7 @@ class CmdRes {
     kInconsistentHashTag,
     kErrOther,
     KIncrByOverFlow,
+    kCacheMiss,
   };
 
   CmdRes() = default;
@@ -371,6 +377,11 @@ class CmdRes {
         result = "-ERR ";
         result.append(message_);
         result.append(kNewLine);
+        break;
+      case kCacheMiss:
+        return "-ERR cache miss\r\n";
+        result.append(message_);
+        result.append("'\r\n");
         break;
       case KIncrByOverFlow:
         result = "-ERR increment would produce NaN or Infinity";
@@ -451,6 +462,9 @@ class Cmd : public std::enable_shared_from_this<Cmd> {
   virtual void ProcessMultiSlotCmd();
   virtual void ProcessDoNotSpecifySlotCmd();
   virtual void Do(std::shared_ptr<Slot> slot = nullptr) = 0;
+  virtual void DoFromCache(std::shared_ptr<Slot> slot = nullptr) {}
+  virtual void DoUpdateCache(std::shared_ptr<Slot> slot = nullptr) {}
+  virtual void PreDo(std::shared_ptr<Slot> slot = nullptr) {}
   virtual Cmd* Clone() = 0;
   // used for execute multikey command into different slots
   virtual void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) = 0;
@@ -466,6 +480,8 @@ class Cmd : public std::enable_shared_from_this<Cmd> {
   bool is_admin_require() const;
   bool is_single_slot() const;
   bool is_multi_slot() const;
+  bool is_need_update_cache() const;
+  bool is_only_from_cache() const;
   bool HashtagIsConsistent(const std::string& lhs, const std::string& rhs) const;
   uint64_t GetDoDuration() const { return do_duration_; };
 

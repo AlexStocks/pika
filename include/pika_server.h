@@ -41,6 +41,8 @@
 #include "include/pika_slot_command.h"
 #include "include/pika_migrate_thread.h"
 #include "include/pika_cmd_table_manager.h"
+//#include "include/pika_cache.h"
+#include "dory/include/RedisCache.h"
 
 
 
@@ -240,6 +242,7 @@ class PikaServer : public pstd::noncopyable {
   void ScheduleClientBgThreads(net::TaskFunc func, void* arg, const std::string& hash_str);
   // for info debug
   size_t ClientProcessorThreadPoolCurQueueSize();
+  size_t ClientProcessorThreadPoolMaxQueueSize();
 
   /*
    * BGSave used
@@ -502,12 +505,91 @@ class PikaServer : public pstd::noncopyable {
     return dbs_;
   }
 
+
+    // for cache info
+    struct DisplayCacheInfo {
+        int status;
+        uint32_t cache_num;
+        uint64_t keys_num;
+        uint64_t used_memory;
+        uint64_t hits;
+        uint64_t misses;
+        uint64_t hits_per_sec;
+        uint64_t read_cmd_per_sec;
+        double hitratio_per_sec;
+        double hitratio_all;
+        uint64_t load_keys_per_sec;
+        uint64_t last_time_us;
+        uint64_t last_load_keys_num;
+        uint32_t waitting_load_keys_num;
+        DisplayCacheInfo()
+                 : status(PIKA_CACHE_STATUS_NONE)
+//      : status(PIKA_CACHE_NONE)
+                , cache_num(0)
+                , keys_num(0)
+                , used_memory(0)
+                , hits(0)
+                , misses(0)
+                , hits_per_sec(0)
+                , read_cmd_per_sec(0)
+                , hitratio_per_sec(0.0)
+                , hitratio_all(0.0)
+                , load_keys_per_sec(0)
+                , last_time_us(pstd::NowMicros())
+                , last_load_keys_num(0)
+                , waitting_load_keys_num(0)
+        {
+
+        }
+        DisplayCacheInfo& operator=(const DisplayCacheInfo &obj) {
+            status = obj.status;
+            cache_num = obj.cache_num;
+            keys_num = obj.keys_num;
+            used_memory = obj.used_memory;
+            hits = obj.hits;
+            misses = obj.misses;
+            hits_per_sec = obj.hits_per_sec;
+            read_cmd_per_sec = obj.read_cmd_per_sec;
+            hitratio_per_sec = obj.hitratio_per_sec;
+            hitratio_all = obj.hitratio_all;
+            load_keys_per_sec = obj.load_keys_per_sec;
+            last_time_us = obj.last_time_us;
+            last_load_keys_num = obj.last_load_keys_num;
+            waitting_load_keys_num = obj.waitting_load_keys_num;
+            return *this;
+        }
+    };
+
+    struct BGCacheTaskArg {
+        BGCacheTaskArg() : c(nullptr), reenable_cache(false) {}
+        int task_type;
+        PikaServer *p;
+        uint32_t cache_num;
+        dory::CacheConfig cache_cfg;
+        PikaConf *c;
+        bool reenable_cache;
+    };
+    void ResetCacheAsync(uint32_t cache_num, dory::CacheConfig *cache_cfg = NULL);
+    void UpdateCacheInfo(void);
+    void GetCacheInfo(DisplayCacheInfo &cache_info);
+    void ResetDisplayCacheInfo(int status);
+    void ClearCacheDbSync(void);
+    void ClearCacheDbAsync(void);
+    void ClearCacheDbAsyncV2(void);
+    void ClearHitRatio(void);
+    void ResetCacheConfig(void);
+    int CacheStatus(void);
+    static void DoCacheBGTask(void* arg);
+    void OnCacheStartPosChanged(int cache_start_pos);
+
   friend class Cmd;
   friend class InfoCmd;
   friend class PikaReplClientConn;
   friend class PkClusterInfoCmd;
+  friend class CacheCmd;
 
- private:
+    std::shared_ptr<PikaCache> cache_;
+private:
   /*
    * TimingTask use
    */
@@ -518,7 +600,9 @@ class PikaServer : public pstd::noncopyable {
   void AutoDeleteExpiredDump();
   void AutoKeepAliveRSync();
   void AutoUpdateNetworkMetric();
-
+  void PrintThreadPoolQueueStatus();
+  void DoClearSysCachedMemory();
+  
   std::string host_;
   int port_ = 0;
   time_t start_time_s_ = 0;
@@ -634,6 +718,32 @@ class PikaServer : public pstd::noncopyable {
   * Info Commandstats used
   */
   std::unordered_map<std::string, CommandStatistics> cmdstat_map_;
+
+    //for info command
+    uint64_t db_size_;
+    uint64_t memtable_usage_;
+    uint64_t table_reader_usage_;
+    uint64_t cache_usage_;
+    uint64_t sst_file_size_;
+    int sst_file_num_;
+    time_t last_info_data_time_;
+
+    int64_t log_size_;
+    time_t last_info_log_time_;
+
+    /*
+  * for cache
+  */
+  DisplayCacheInfo cache_info_;
+
+    std::shared_mutex rwlock_;
+  std::shared_mutex cache_info_rwlock_;
+
+  net::BGThread common_bg_thread_;
+
+    void CacheConfigInit(dory::CacheConfig &cache_cfg);
+
+    void CreateCache();
 };
 
 #endif

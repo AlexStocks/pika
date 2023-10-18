@@ -13,6 +13,7 @@
 #include "pstd/include/env.h"
 #include "pstd/include/pstd_string.h"
 
+#include "dory/include/RedisDef.h"
 #include "include/pika_define.h"
 
 using pstd::Status;
@@ -158,6 +159,7 @@ int PikaConf::Load() {
   } else if (run_id_.length() != configRunIDSize) {
     LOG(FATAL) << "run-id " << run_id_ << " is invalid, its string length should be " << configRunIDSize;
   }
+  GetConfStr("replication-id", &replication_id_);
   GetConfStr("requirepass", &requirepass_);
   GetConfStr("masterauth", &masterauth_);
   GetConfStr("userpass", &userpass_);
@@ -403,7 +405,7 @@ int PikaConf::Load() {
   // rate-limiter-bandwidth
   GetConfInt64("rate-limiter-bandwidth", &rate_limiter_bandwidth_);
   if (rate_limiter_bandwidth_ <= 0) {
-    rate_limiter_bandwidth_ = 200 * 1024 * 1024;  // 200MB
+    rate_limiter_bandwidth_ = 2000 * 1024 * 1024;  // 2000MB/s
   }
 
   // rate-limiter-refill-period-us
@@ -469,6 +471,15 @@ int PikaConf::Load() {
   }
   if (max_background_compactions_ >= 8) {
     max_background_compactions_ = 8;
+  }
+
+  max_background_jobs_ = (1 + 2);
+  GetConfInt("max-background-jobs", &max_background_jobs_);
+  if (max_background_jobs_ <= 0) {
+    max_background_jobs_ = (1 + 2);
+  }
+  if (max_background_jobs_ >= (8 + 4)) {
+    max_background_jobs_ = (8 + 4);
   }
 
   max_cache_files_ = 5000;
@@ -556,7 +567,47 @@ int PikaConf::Load() {
       master_run_id_ = master_run_id;
     }
   }
+  int cache_num = 16 ;
+  GetConfInt("cache-num", &cache_num);
+  cache_num_ = (0 >= cache_num || 48 < cache_num) ? 16 : cache_num;
 
+  int cache_model = 0;
+  GetConfInt("cache-model", &cache_model);
+  cache_model_ = (PIKA_CACHE_NONE > cache_model || PIKA_CACHE_READ < cache_model) ? PIKA_CACHE_NONE : cache_model;
+
+  std::string cache_type;
+  GetConfStr("cache-type", &cache_type);
+  SetCacheType(cache_type);
+
+  int cache_start_pos = 0;
+  GetConfInt("cache-start-direction", &cache_start_pos);
+  if (cache_start_pos != dory::CACHE_START_FROM_BEGIN && cache_start_pos != dory::CACHE_START_FROM_END) {
+    cache_start_pos = dory::CACHE_START_FROM_BEGIN;
+  }
+  cache_start_pos_ = cache_start_pos;
+
+  int cache_items_per_key = DEFAULT_CACHE_ITEMS_PER_KEY;
+  GetConfInt("cache-items-per-key", &cache_items_per_key);
+  if (cache_items_per_key <= 0) {
+    cache_items_per_key = DEFAULT_CACHE_ITEMS_PER_KEY;
+  }
+  cache_items_per_key_ = cache_items_per_key;
+
+  int64_t cache_maxmemory = 10737418240 ;
+  GetConfInt64("cache-maxmemory", &cache_maxmemory);
+  cache_maxmemory_ = (PIKA_CACHE_SIZE_MIN > cache_maxmemory) ? PIKA_CACHE_SIZE_DEFAULT : cache_maxmemory;
+
+  int cache_maxmemory_policy = 1;
+  GetConfInt("cache-maxmemory-policy", &cache_maxmemory_policy);
+  cache_maxmemory_policy_ = (0 > cache_maxmemory_policy || 7 < cache_maxmemory_policy) ? 1 : cache_maxmemory_policy;
+
+  int cache_maxmemory_samples = 5 ;
+  GetConfInt("cache-maxmemory-samples", &cache_maxmemory_samples);
+  cache_maxmemory_samples_ = (1 > cache_maxmemory_samples) ? 5 : cache_maxmemory_samples;
+
+  int cache_lfu_decay_time = 1;
+  GetConfInt("cache-lfu-decay-time", &cache_lfu_decay_time);
+  cache_lfu_decay_time_ = (0 > cache_lfu_decay_time) ? 1 : cache_lfu_decay_time;
   // sync window size
   int tmp_sync_window_size = kBinlogReadWinDefaultSize;
   GetConfInt("sync-window-size", &tmp_sync_window_size);
@@ -605,7 +656,7 @@ int PikaConf::Load() {
   // throttle-bytes-per-second
   GetConfInt("throttle-bytes-per-second", &throttle_bytes_per_second_);
   if (throttle_bytes_per_second_ <= 0) {
-    throttle_bytes_per_second_ = 307200000;
+    throttle_bytes_per_second_ = 207200000;
   }
 
   GetConfInt("max-rsync-parallel-num", &max_rsync_parallel_num_);
@@ -617,6 +668,34 @@ int PikaConf::Load() {
 void PikaConf::TryPushDiffCommands(const std::string& command, const std::string& value) {
   if (!CheckConfExist(command)) {
     diff_commands_[command] = value;
+  }
+}
+
+void PikaConf::SetCacheType(const std::string &value) {
+  cache_string_ = cache_set_ = cache_zset_ = cache_hash_ = cache_list_ = cache_bit_ = 0;
+  if (value == "") {
+    return;
+  }
+  std::lock_guard l(rwlock_);
+
+  std::string lower_value = value;
+  pstd::StringToLower(lower_value);
+  lower_value.erase(remove_if(lower_value.begin(), lower_value.end(), isspace), lower_value.end());
+  pstd::StringSplit(lower_value, COMMA, cache_type_);
+  for (auto& type : cache_type_) {
+    if (type == "string") {
+      cache_string_ = 1;
+    } else if (type == "set") {
+      cache_set_ = 1;
+    } else if (type == "zset") {
+      cache_zset_ = 1;
+    } else if (type == "hash") {
+      cache_hash_ = 1;
+    } else if (type == "list") {
+      cache_list_ = 1;
+    } else if (type == "bit") {
+      cache_bit_ = 1;
+    }
   }
 }
 
@@ -642,6 +721,7 @@ int PikaConf::ConfigRewrite() {
   SetConfStr("write-binlog", write_binlog_ ? "yes" : "no");
   SetConfStr("run-id", run_id_);
   SetConfStr("master-run-id", master_run_id_);
+  SetConfStr("replication-id", replication_id_);
   SetConfInt("max-cache-statistic-keys", max_cache_statistic_keys_);
   SetConfInt("small-compaction-threshold", small_compaction_threshold_);
   SetConfInt("max-client-response-size", static_cast<int32_t>(max_client_response_size_));
@@ -660,6 +740,7 @@ int PikaConf::ConfigRewrite() {
   // options for storage engine
   SetConfInt("max-cache-files", max_cache_files_);
   SetConfInt("max-background-compactions", max_background_compactions_);
+  SetConfInt("max-background-jobs", max_background_jobs_);
   SetConfInt("max-write-buffer-num", max_write_buffer_num_);
   SetConfInt64("write-buffer-size", write_buffer_size_);
   SetConfInt64("arena-block-size", arena_block_size_);
@@ -677,6 +758,29 @@ int PikaConf::ConfigRewrite() {
     }
     if (!filtered_items.empty()) {
       pstd::BaseConf::Rep::ConfItem comment_item(pstd::BaseConf::Rep::kComment, "# Generated by CONFIG REWRITE\n");
+      PushConfItem(comment_item);
+      for (const auto& item : filtered_items) {
+        PushConfItem(item);
+      }
+    }
+    diff_commands_.clear();
+  }
+  return static_cast<int>(WriteBack());
+}
+
+int PikaConf::ConfigRewriteReplicationID() {
+  std::lock_guard l(rwlock_);
+  SetConfStr("replication-id", replication_id_);
+  if (!diff_commands_.empty()) {
+    std::vector<pstd::BaseConf::Rep::ConfItem> filtered_items;
+    for (const auto& diff_command : diff_commands_) {
+      if (!diff_command.second.empty()) {
+        pstd::BaseConf::Rep::ConfItem item(pstd::BaseConf::Rep::kConf, diff_command.first, diff_command.second);
+        filtered_items.push_back(item);
+      }
+    }
+    if (!filtered_items.empty()) {
+      pstd::BaseConf::Rep::ConfItem comment_item(pstd::BaseConf::Rep::kComment, "# Generated by ReplicationID CONFIG REWRITE\n");
       PushConfItem(comment_item);
       for (const auto& item : filtered_items) {
         PushConfItem(item);
