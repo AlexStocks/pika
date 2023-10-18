@@ -29,6 +29,13 @@
 #define PIKA_MAX_CONN_RBUF_HB (1 << 29)  // 512MB
 #define PIKA_SERVER_ID_MAX 65535
 
+/*
+ * cache task type
+ */
+#define CACHE_BGTASK_CLEAR      0
+#define CACHE_BGTASK_RESET_NUM  1
+#define CACHE_BGTASK_RESET_CFG  2
+
 class PikaServer;
 
 /* Port shift */
@@ -329,6 +336,30 @@ const int PIKA_REPL_ERROR = 3;
 const int PIKA_ROLE_SINGLE = 0;
 const int PIKA_ROLE_SLAVE = 1;
 const int PIKA_ROLE_MASTER = 2;
+
+/*
+ * cache model
+ */
+constexpr int PIKA_CACHE_NONE = 0;
+constexpr int PIKA_CACHE_READ = 1;
+
+/*
+ * cache size
+ */
+#define PIKA_CACHE_SIZE_MIN       536870912    // 512M
+#define PIKA_CACHE_SIZE_DEFAULT   10737418240  // 10G
+
+/*
+ * cache status
+ */
+const int PIKA_CACHE_STATUS_NONE = 0;
+const int PIKA_CACHE_STATUS_INIT = 1;
+const int PIKA_CACHE_STATUS_OK = 2;
+const int PIKA_CACHE_STATUS_RESET = 3;
+const int PIKA_CACHE_STATUS_DESTROY = 4;
+const int PIKA_CACHE_STATUS_CLEAR = 5;
+const int CACHE_START_FROM_BEGIN = 0;
+const int CACHE_START_FROM_END = -1;
 
 /*
  * The size of Binlogfile
